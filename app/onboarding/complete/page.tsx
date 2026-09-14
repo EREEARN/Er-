@@ -1,0 +1,9 @@
+import OnboardingComplete from "@/components/layouts/auth/onboarding-complete";
+
+export default function OnboardingCompletePage() {
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6 py-12">
+            <OnboardingComplete />
+        </div>
+    );
+}
