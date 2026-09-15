@@ -3,61 +3,78 @@
 import { useState } from "react";
 import { Copy, ExternalLink, Search } from "lucide-react";
 import { AppInput } from "@/components/reuseables/app-input";
+import { AppButton } from "@/components/reuseables/app-button";
+import { ConnectWalletModal } from "@/components/reuseables/connect-wallet-modal";
+import { Spinner } from "@/components/ui/spinner";
 import { TransactionStatusModal } from "@/components/reuseables/transaction-status-modal";
+import { useCurrentUser } from "@/hooks/use-auth";
+import { useContributorDashboard, usePosterDashboard } from "@/hooks/use-dashboard";
+import { useWalletTransactions, type WalletTransaction } from "@/hooks/use-transactions";
+import type { TransactionStatus, TransactionType } from "@/lib/api/types";
 import { cn } from "cn";
 import { Text } from "@/components/reuseables/text";
 
-type TransactionType = "Escrow Release" | "Funded Escrow" | "Claimed Reward" | "Escrow Refund";
-type TransactionStatus = "Success" | "Pending" | "Failed";
-
-type Transaction = {
-    date: string;
-    type: TransactionType;
-    title: string;
-    amount: number;
-    status: TransactionStatus;
-    hash: string;
+const typeLabels: Record<TransactionType, string> = {
+    FUND_ESCROW: "Funded Escrow",
+    RELEASE_PAYMENT: "Escrow Release",
+    REFUND: "Escrow Refund",
 };
 
-const transactions: Transaction[] = [
-    { date: "Mar 08, 2026", type: "Escrow Release", title: "Build Stellar Wallet Connector Hook", amount: 1200, status: "Success", hash: "GD3F...18B2" },
-    { date: "Mar 05, 2026", type: "Funded Escrow", title: "Setup Soroban Multi-Sig Escrow Contract", amount: -3500, status: "Success", hash: "GC8D...A9E3" },
-    { date: "Mar 03, 2026", type: "Claimed Reward", title: "Design Landing Page for Stellar Asset", amount: 800, status: "Pending", hash: "tx_e0294e...9ba35c" },
-    { date: "Feb 28, 2026", type: "Escrow Refund", title: "Fix Soroban CLI script template", amount: 500, status: "Failed", hash: "GD9K...4F7A" },
-];
-
 const typeStyles: Record<TransactionType, string> = {
-    "Escrow Release": "bg-app-light-primary text-app-primary",
-    "Funded Escrow": "bg-gray-100 text-gray-700",
-    "Claimed Reward": "bg-amber-50 text-amber-600",
-    "Escrow Refund": "bg-gray-100 text-gray-700",
+    RELEASE_PAYMENT: "bg-app-light-primary text-app-primary",
+    FUND_ESCROW: "bg-gray-100 text-gray-700",
+    REFUND: "bg-amber-50 text-amber-600",
+};
+
+const statusLabels: Record<TransactionStatus, string> = {
+    SUCCESS: "Success",
+    PENDING: "Pending",
+    FAILED: "Failed",
 };
 
 const statusStyles: Record<TransactionStatus, string> = {
-    Success: "bg-app-green/10 text-app-green",
-    Pending: "bg-amber-50 text-amber-600",
-    Failed: "bg-app-red/10 text-app-red",
+    SUCCESS: "bg-app-green/10 text-app-green",
+    PENDING: "bg-amber-50 text-amber-600",
+    FAILED: "bg-app-red/10 text-app-red",
 };
 
-const stats = [
-    { label: "Total Earned", value: "4,700 XLM", note: "Soroban Rewards" },
-    { label: "Total Spent", value: "0 XLM", note: "Poster Lock Costs" },
-    { label: "Pending Review", value: "3,500 XLM", note: "Escrow Reserved" },
-    { label: "In Active Escrow", value: "1,200 XLM", note: "Active Contract" },
-];
+const typeFilters: (TransactionType | "All Types")[] = ["All Types", "FUND_ESCROW", "RELEASE_PAYMENT", "REFUND"];
+const statusFilters: (TransactionStatus | "All Statuses")[] = ["All Statuses", "SUCCESS", "PENDING", "FAILED"];
 
-const typeFilters = ["All Types", "Escrow Release", "Funded Escrow", "Claimed Reward", "Escrow Refund"];
-const statusFilters = ["All Statuses", "Success", "Pending", "Failed"];
+function truncateAddress(address: string) {
+    if (address.length <= 12) return address;
+    return `${address.slice(0, 6)}...${address.slice(-6)}`;
+}
 
 const WalletTransactions = () => {
+    const { data: user } = useCurrentUser();
+    const contributorDashboard = useContributorDashboard();
+    const posterDashboard = usePosterDashboard();
+    const { transactions, isLoading, isError } = useWalletTransactions();
+
     const [search, setSearch] = useState("");
-    const [typeFilter, setTypeFilter] = useState("All Types");
-    const [statusFilter, setStatusFilter] = useState("All Statuses");
-    const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+    const [typeFilter, setTypeFilter] = useState<(typeof typeFilters)[number]>("All Types");
+    const [statusFilter, setStatusFilter] = useState<(typeof statusFilters)[number]>("All Statuses");
+    const [selectedTx, setSelectedTx] = useState<WalletTransaction | null>(null);
+
+    const isPoster = user?.role === "POSTER";
+    const stats = isPoster
+        ? [
+              { label: "Total Spent", value: posterDashboard.data ? `${Number(posterDashboard.data.total_spent).toLocaleString()}` : "—", note: "Poster Lock Costs" },
+              { label: "Active Bounties", value: posterDashboard.data ? `${posterDashboard.data.active_bounties.length}` : "—", note: "Currently Live" },
+              { label: "Pending Reviews", value: posterDashboard.data ? `${posterDashboard.data.pending_reviews.length}` : "—", note: "Awaiting Decision" },
+              { label: "Completed", value: posterDashboard.data ? `${posterDashboard.data.completed_bounties.length}` : "—", note: "Fully Paid Out" },
+          ]
+        : [
+              { label: "Total Earned", value: contributorDashboard.data ? `${Number(contributorDashboard.data.total_earned).toLocaleString()}` : "—", note: "Soroban Rewards" },
+              { label: "Active Claims", value: contributorDashboard.data ? `${contributorDashboard.data.active_claims.length}` : "—", note: "In Progress" },
+              { label: "Awaiting Review", value: contributorDashboard.data ? `${contributorDashboard.data.submitted.length}` : "—", note: "Submitted Work" },
+              { label: "Completed", value: contributorDashboard.data ? `${contributorDashboard.data.completed.length}` : "—", note: "Approved & Paid" },
+          ];
 
     const filtered = transactions.filter((tx) => {
-        const matchesSearch = tx.title.toLowerCase().includes(search.toLowerCase());
-        const matchesType = typeFilter === "All Types" || tx.type === typeFilter;
+        const matchesSearch = tx.bountyTitle.toLowerCase().includes(search.toLowerCase());
+        const matchesType = typeFilter === "All Types" || tx.tx_type === typeFilter;
         const matchesStatus = statusFilter === "All Statuses" || tx.status === statusFilter;
         return matchesSearch && matchesType && matchesStatus;
     });
@@ -72,17 +89,25 @@ const WalletTransactions = () => {
         <div>
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                 <div>
-                    <div className="flex items-center gap-2">
-                        <Text as="h1" className="text-2xl font-bold text-app-dark-purple">GD7X...4E63</Text>
-                        <button type="button" className="text-app-grey-light hover:text-app-primary">
-                            <Copy className="size-4" />
-                        </button>
-                    </div>
-                    <Text as="p" className="mt-1 text-sm text-app-grey-light">Freighter Wallet · Connected on Stellar Testnet Network</Text>
-                </div>
-                <div className="text-left sm:text-right">
-                    <Text as="p" className="text-xs text-app-grey-light">Current Balance</Text>
-                    <Text as="p" className="text-2xl font-bold text-app-primary">12,450.85 XLM</Text>
+                    {user?.wallet_address ? (
+                        <div className="flex items-center gap-2">
+                            <Text as="h1" className="text-2xl font-bold text-app-dark-purple">
+                                {truncateAddress(user.wallet_address)}
+                            </Text>
+                            <button
+                                type="button"
+                                onClick={() => navigator.clipboard.writeText(user.wallet_address)}
+                                className="text-app-grey-light hover:text-app-primary"
+                            >
+                                <Copy className="size-4" />
+                            </button>
+                        </div>
+                    ) : (
+                        <ConnectWalletModal
+                            trigger={<AppButton variant="primary" className="h-9 px-4 text-xs">Connect Wallet</AppButton>}
+                        />
+                    )}
+                    <Text as="p" className="mt-1 text-sm text-app-grey-light">Connected on Stellar Testnet Network</Text>
                 </div>
             </div>
 
@@ -106,23 +131,23 @@ const WalletTransactions = () => {
                 />
                 <select
                     value={typeFilter}
-                    onChange={(event) => setTypeFilter(event.target.value)}
+                    onChange={(event) => setTypeFilter(event.target.value as (typeof typeFilters)[number])}
                     className="h-10 rounded-[6px] border border-app-light-primary bg-white px-3 text-sm text-app-dark-purple outline-none focus-visible:border-app-primary focus-visible:ring-3 focus-visible:ring-app-primary/20"
                 >
                     {typeFilters.map((option) => (
                         <option key={option} value={option}>
-                            {option}
+                            {option === "All Types" ? option : typeLabels[option]}
                         </option>
                     ))}
                 </select>
                 <select
                     value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
+                    onChange={(event) => setStatusFilter(event.target.value as (typeof statusFilters)[number])}
                     className="h-10 rounded-[6px] border border-app-light-primary bg-white px-3 text-sm text-app-dark-purple outline-none focus-visible:border-app-primary focus-visible:ring-3 focus-visible:ring-app-primary/20"
                 >
                     {statusFilters.map((option) => (
                         <option key={option} value={option}>
-                            {option}
+                            {option === "All Statuses" ? option : statusLabels[option]}
                         </option>
                     ))}
                 </select>
@@ -135,86 +160,104 @@ const WalletTransactions = () => {
                 </button>
             </div>
 
-            <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-100">
-                <table className="w-full text-left text-sm">
-                    <thead>
-                        <tr className="border-b border-gray-100 text-xs text-app-grey-light">
-                            <th className="px-4 py-3 font-medium">Date</th>
-                            <th className="px-4 py-3 font-medium">Type</th>
-                            <th className="px-4 py-3 font-medium">Bounty Title</th>
-                            <th className="px-4 py-3 font-medium">Amount</th>
-                            <th className="px-4 py-3 font-medium">Status</th>
-                            <th className="px-4 py-3 font-medium">Explorer</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filtered.map((tx) => (
-                            <tr key={`${tx.date}-${tx.title}`} className="border-b border-gray-100 last:border-b-0">
-                                <td className="px-4 py-3 whitespace-nowrap text-app-grey-light">{tx.date}</td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                    <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", typeStyles[tx.type])}>
-                                        {tx.type}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 font-medium text-app-dark-purple">{tx.title}</td>
-                                <td
-                                    className={cn(
-                                        "px-4 py-3 font-semibold whitespace-nowrap",
-                                        tx.amount >= 0 ? "text-app-green" : "text-app-dark-purple"
-                                    )}
-                                >
-                                    {tx.amount >= 0 ? "+" : ""}
-                                    {tx.amount.toLocaleString()} XLM
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                    <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", statusStyles[tx.status])}>
-                                        {tx.status}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedTx(tx)}
-                                        className="inline-flex items-center gap-1 text-xs font-medium text-app-primary hover:underline"
-                                    >
-                                        View Transaction <ExternalLink className="size-3" />
-                                    </button>
-                                </td>
+            {isLoading && (
+                <div className="mt-6 flex items-center justify-center py-16">
+                    <Spinner className="size-6 text-app-primary" />
+                </div>
+            )}
+
+            {isError && (
+                <div className="mt-6 rounded-2xl border border-gray-100 py-16 text-center text-sm text-app-red">
+                    Couldn&apos;t load your transactions right now. Please try again shortly.
+                </div>
+            )}
+
+            {!isLoading && !isError && (
+                <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-100">
+                    <table className="w-full text-left text-sm">
+                        <thead>
+                            <tr className="border-b border-gray-100 text-xs text-app-grey-light">
+                                <th className="px-4 py-3 font-medium">Date</th>
+                                <th className="px-4 py-3 font-medium">Type</th>
+                                <th className="px-4 py-3 font-medium">Bounty Title</th>
+                                <th className="px-4 py-3 font-medium">Amount</th>
+                                <th className="px-4 py-3 font-medium">Status</th>
+                                <th className="px-4 py-3 font-medium">Explorer</th>
                             </tr>
-                        ))}
-                        {filtered.length === 0 && (
-                            <tr>
-                                <td colSpan={6} className="px-4 py-8 text-center text-sm text-app-grey-light">
-                                    No transactions match your filters.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            {filtered.map((tx) => {
+                                const isIncoming = tx.to_address === user?.wallet_address;
+                                return (
+                                    <tr key={tx.id} className="border-b border-gray-100 last:border-b-0">
+                                        <td className="px-4 py-3 whitespace-nowrap text-app-grey-light">
+                                            {new Date(tx.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", typeStyles[tx.tx_type])}>
+                                                {typeLabels[tx.tx_type]}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 font-medium text-app-dark-purple">{tx.bountyTitle}</td>
+                                        <td
+                                            className={cn(
+                                                "px-4 py-3 font-semibold whitespace-nowrap",
+                                                isIncoming ? "text-app-green" : "text-app-dark-purple"
+                                            )}
+                                        >
+                                            {isIncoming ? "+" : "-"}
+                                            {Number(tx.amount).toLocaleString()} {tx.asset}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", statusStyles[tx.status])}>
+                                                {statusLabels[tx.status]}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedTx(tx)}
+                                                className="inline-flex items-center gap-1 text-xs font-medium text-app-primary hover:underline"
+                                            >
+                                                View Transaction <ExternalLink className="size-3" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {filtered.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-app-grey-light">
+                                        No transactions match your filters.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {selectedTx && (
                 <TransactionStatusModal
                     open={Boolean(selectedTx)}
                     onOpenChange={(open) => !open && setSelectedTx(null)}
-                    status={selectedTx.status === "Success" ? "success" : selectedTx.status === "Pending" ? "pending" : "failed"}
+                    status={selectedTx.status === "SUCCESS" ? "success" : selectedTx.status === "PENDING" ? "pending" : "failed"}
                     title={
-                        selectedTx.status === "Success"
+                        selectedTx.status === "SUCCESS"
                             ? "Transaction Successful"
-                            : selectedTx.status === "Pending"
+                            : selectedTx.status === "PENDING"
                               ? "Transaction Pending"
                               : "Transaction Failed"
                     }
                     description={
-                        selectedTx.status === "Success"
-                            ? `Your payment of ${Math.abs(selectedTx.amount).toLocaleString()} XLM has been successfully released to the contributor's Stellar wallet. Thank you for completing your review.`
-                            : selectedTx.status === "Pending"
-                              ? "Your transaction is being processed on Stellar Testnet. We are locking the requested milestone funds in the smart escrow contract."
-                              : "The transaction could not be completed. Account balance is insufficient to lock rewards. Funds remain in your wallet."
+                        selectedTx.status === "SUCCESS"
+                            ? `${Number(selectedTx.amount).toLocaleString()} ${selectedTx.asset} was successfully transferred on the Stellar Soroban escrow contract for "${selectedTx.bountyTitle}".`
+                            : selectedTx.status === "PENDING"
+                              ? "This transaction is still being confirmed on the Stellar Testnet ledger."
+                              : "This transaction could not be completed on the Stellar ledger."
                     }
-                    hash={selectedTx.hash}
-                    estimatedTime={selectedTx.status === "Pending" ? "~5 seconds" : undefined}
-                    reason={selectedTx.status === "Failed" ? "tx_insufficient_balance" : undefined}
+                    hash={selectedTx.tx_hash}
+                    explorerHref={selectedTx.explorer_url || undefined}
                 />
             )}
         </div>
@@ -222,3 +265,4 @@ const WalletTransactions = () => {
 };
 
 export default WalletTransactions;
+

@@ -26,28 +26,22 @@ const CreateBountyForm = () => {
     const [step, setStep] = useState(0);
     const [fundModalOpen, setFundModalOpen] = useState(false);
 
-    const [title, setTitle] = useState("Build Stellar Wallet Connector React Hook");
+    const [title, setTitle] = useState("");
     const [category, setCategory] = useState<SkillCategory>(categories[0].value);
-    const [description, setDescription] = useState(
-        "Create an optimized, easily extensible custom React hook to manage freighter and albedo wallet connections on the Stellar Testnet. This should handle session persistence..."
-    );
-    const [requirements, setRequirements] = useState([
-        "Frictionless connection state management",
-        "Unit testing with 90%+ coverage",
-    ]);
+    const [description, setDescription] = useState("");
+    const [requirements, setRequirements] = useState<string[]>([]);
     const [newRequirement, setNewRequirement] = useState("");
-    const [skills, setSkills] = useState(["React", "Frontend", "Stellar"]);
+    const [skills, setSkills] = useState<string[]>([]);
     const [skillInput, setSkillInput] = useState("");
 
     const [asset, setAsset] = useState<"XLM" | "USDC">("XLM");
-    const [rewardAmount, setRewardAmount] = useState("1000");
+    const [rewardAmount, setRewardAmount] = useState("");
 
-    const [deadlineDate, setDeadlineDate] = useState<Date | undefined>(new Date(2026, 2, 20));
+    const [deadlineDate, setDeadlineDate] = useState<Date | undefined>(undefined);
     const [endTime, setEndTime] = useState("23:59");
     const [allowExtensions, setAllowExtensions] = useState(true);
 
     const rewardNumber = Number(rewardAmount) || 0;
-    const usdEquivalent = (rewardNumber * 0.1254).toFixed(2);
     const platformFeePercent = 1;
     const platformFee = Math.round(rewardNumber * (platformFeePercent / 100) * 100) / 100;
     const totalRequired = rewardNumber + platformFee;
@@ -108,7 +102,7 @@ const CreateBountyForm = () => {
                             </Text>
 
                             <div className="mt-4 flex flex-col gap-4 border-t border-gray-100 pt-4">
-                                <AppInput label="Bounty Title" value={title} onValueChange={setTitle} />
+                                <AppInput label="Bounty Title" placeholder="e.g. Build Stellar Wallet Connector React Hook" value={title} onValueChange={setTitle} />
 
                                 <div className="flex flex-col gap-1.5">
                                     <label className="text-sm font-medium text-app-dark-purple">Category</label>
@@ -134,6 +128,7 @@ const CreateBountyForm = () => {
                                         rows={4}
                                         value={description}
                                         onChange={(event) => setDescription(event.target.value)}
+                                        placeholder="Describe the deliverables, scope, and acceptance criteria for this bounty."
                                         className="w-full rounded-[6px] border border-app-light-primary bg-white px-3.5 py-2.5 text-sm text-app-dark-purple outline-none transition-colors placeholder:text-app-grey-light focus-visible:border-app-primary focus-visible:ring-3 focus-visible:ring-app-primary/20"
                                     />
                                 </div>
@@ -285,6 +280,7 @@ const CreateBountyForm = () => {
                                         <input
                                             value={rewardAmount}
                                             onChange={(event) => setRewardAmount(event.target.value.replace(/[^0-9.]/g, ""))}
+                                            placeholder="0.00"
                                             className="h-10 w-full rounded-[6px] border border-app-light-primary bg-white px-3.5 pr-14 text-sm text-app-dark-purple outline-none focus-visible:border-app-primary focus-visible:ring-3 focus-visible:ring-app-primary/20"
                                         />
                                         <span className="absolute top-1/2 right-3 -translate-y-1/2 text-sm font-medium text-app-grey-light">
@@ -292,7 +288,7 @@ const CreateBountyForm = () => {
                                         </span>
                                     </div>
                                     <Text as="p" className="mt-1 text-xs text-app-grey-light">
-                                        ≈ ${usdEquivalent} USD (at current market rate: 1 XLM = $0.1254 USD)
+                                        Reward is locked in a Stellar Soroban smart contract escrow until work is approved.
                                     </Text>
                                 </div>
 
@@ -509,7 +505,6 @@ const CreateBountyForm = () => {
                 onOpenChange={setFundModalOpen}
                 bountyPayload={bountyPayload}
                 platformFeePercent={platformFeePercent}
-                walletBalance={4520.45}
             />
         </div>
     );

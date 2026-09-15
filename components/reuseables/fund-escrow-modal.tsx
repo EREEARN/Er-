@@ -16,7 +16,6 @@ type FundEscrowModalProps = {
     onOpenChange: (open: boolean) => void
     bountyPayload: CreateBountyPayload
     platformFeePercent: number
-    walletBalance: number
 }
 
 type Stage = "confirm" | "preparing" | "sign" | "publishing" | "published" | "failed"
@@ -26,7 +25,6 @@ const FundEscrowModal = ({
     onOpenChange,
     bountyPayload,
     platformFeePercent,
-    walletBalance,
 }: FundEscrowModalProps) => {
     const [stage, setStage] = useState<Stage>("confirm")
     const [signedXdr, setSignedXdr] = useState("")
@@ -89,11 +87,6 @@ const FundEscrowModal = ({
                             <span className="font-semibold text-app-dark-purple">Total Payable</span>
                             <span className="font-bold text-app-primary">{total.toLocaleString()} {bountyPayload.reward_asset}</span>
                         </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between text-sm">
-                        <span className="text-app-grey-light">Your Wallet Balance</span>
-                        <span className="font-semibold text-app-green">{walletBalance.toLocaleString()} {bountyPayload.reward_asset}</span>
                     </div>
 
                     <div className="mt-4 rounded-xl bg-app-light-primary/50 p-3 text-sm text-app-primary">
