@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { AppImages } from "@/assets/app_images";
 import { AppButton } from "@/components/reuseables/app-button";
-import { useAppStore } from "@/lib/store";
+import { useCurrentUser } from "@/hooks/use-auth";
 import { cn } from "cn";
 import {
     Sidebar,
@@ -54,8 +54,8 @@ const accountLinks = [
 
 const AppSidebar = () => {
     const pathname = usePathname();
-    const role = useAppStore((state) => state.role);
-    const setRole = useAppStore((state) => state.setRole);
+    const { data: user } = useCurrentUser();
+    const role = user?.role === "POSTER" ? "poster" : "contributor";
     const contributingLinks = getContributingLinks(role);
 
     const renderLink = (link: NavLink) => {
@@ -116,29 +116,6 @@ const AppSidebar = () => {
                 >
                     Create a bounty
                 </AppButton>
-
-                <div className="flex rounded-xl bg-gray-100 p-1 text-xs font-medium">
-                    <button
-                        type="button"
-                        onClick={() => setRole("contributor")}
-                        className={cn(
-                            "flex-1 rounded-lg py-1.5 transition-colors",
-                            role === "contributor" ? "bg-white text-app-dark-purple shadow-sm" : "text-app-grey-light"
-                        )}
-                    >
-                        Contributor
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setRole("poster")}
-                        className={cn(
-                            "flex-1 rounded-lg py-1.5 transition-colors",
-                            role === "poster" ? "bg-white text-app-dark-purple shadow-sm" : "text-app-grey-light"
-                        )}
-                    >
-                        Poster
-                    </button>
-                </div>
             </SidebarFooter>
         </Sidebar>
     );

@@ -11,6 +11,7 @@ import { AppButton } from "@/components/reuseables/app-button";
 import { Text } from "@/components/reuseables/text";
 import { useLogin } from "@/hooks/use-auth";
 import { getApiErrorMessage } from "@/lib/api/api-error";
+import { ConnectWalletModal } from "@/components/reuseables/connect-wallet-modal";
 
 const LoginForm = () => {
     const router = useRouter();
@@ -92,14 +93,18 @@ const LoginForm = () => {
                 <span className="h-px flex-1 bg-gray-100" />
             </div>
 
-            <AppButton
-                variant="outline"
-                color="#111827"
-                className="w-full justify-center gap-2 border-gray-200"
-            >
-                <Image src={AppImages.basilWalletSolid} alt="" width={16} height={16} />
-                Connect Wallet
-            </AppButton>
+            <ConnectWalletModal
+                trigger={
+                    <AppButton
+                        variant="outline"
+                        color="#111827"
+                        className="w-full justify-center gap-2 border-gray-200"
+                    >
+                        <Image src={AppImages.basilWalletSolid} alt="" width={16} height={16} />
+                        Connect Wallet
+                    </AppButton>
+                }
+            />
 
             <Text as="p" className="mt-6 text-center text-sm text-app-grey-light">
                 Don&apos;t have an account?{" "}

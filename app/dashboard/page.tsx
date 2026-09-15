@@ -1,11 +1,20 @@
 "use client";
 
-import { useAppStore } from "@/lib/store";
+import { useCurrentUser } from "@/hooks/use-auth";
+import { Spinner } from "@/components/ui/spinner";
 import ContributorDashboard from "@/components/layouts/dashboard/contributor-dashboard";
 import PosterDashboard from "@/components/layouts/dashboard/poster-dashboard";
 
 export default function DashboardPage() {
-    const role = useAppStore((state) => state.role);
+    const { data: user, isLoading } = useCurrentUser();
 
-    return role === "poster" ? <PosterDashboard /> : <ContributorDashboard />;
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <Spinner className="size-6 text-app-primary" />
+            </div>
+        );
+    }
+
+    return user?.role === "POSTER" ? <PosterDashboard /> : <ContributorDashboard />;
 }
