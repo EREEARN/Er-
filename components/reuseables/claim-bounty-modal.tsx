@@ -7,6 +7,8 @@ import { AlertTriangle, CircleCheck, LoaderCircle } from "lucide-react"
 import { AppModal } from "@/components/reuseables/app-modal"
 import { AppButton } from "@/components/reuseables/app-button"
 import { Text } from "@/components/reuseables/text"
+import { useClaimBounty } from "@/hooks/use-bounties"
+import { useAuthStore } from "@/lib/auth-store"
 import type { Bounty } from "@/lib/bounties"
 
 type Step = "network" | "confirm" | "processing" | "claimed"
@@ -20,10 +22,14 @@ const ClaimBountyModal = ({ trigger, bounty }: ClaimBountyModalProps) => {
     const [open, setOpen] = useState(false)
     const [step, setStep] = useState<Step>("network")
     const [agreed, setAgreed] = useState(false)
+    const [claimError, setClaimError] = useState<string | null>(null)
+    const claimBounty = useClaimBounty()
+    const walletAddress = useAuthStore((state) => state.user?.wallet_address)
 
     const reset = () => {
         setStep("network")
         setAgreed(false)
+        setClaimError(null)
     }
 
     const handleOpenChange = (nextOpen: boolean) => {
@@ -36,8 +42,15 @@ const ClaimBountyModal = ({ trigger, bounty }: ClaimBountyModalProps) => {
     useEffect(() => {
         if (step !== "processing") return
 
-        const timeout = setTimeout(() => setStep("claimed"), 2200)
-        return () => clearTimeout(timeout)
+        claimBounty.mutate(bounty.id, {
+            onSuccess: () => setStep("claimed"),
+            onError: (error) => {
+                setClaimError(error instanceof Error ? error.message : "Unable to claim this bounty. Please try again.")
+                setStep("confirm")
+            },
+        })
+        // Only re-run when the step transitions into "processing".
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [step])
 
     return (
@@ -112,8 +125,12 @@ const ClaimBountyModal = ({ trigger, bounty }: ClaimBountyModalProps) => {
 
                     <div className="mt-4 flex items-center justify-between text-sm">
                         <span className="text-app-grey-light">Stellar Account Address:</span>
-                        <span className="font-semibold text-app-primary">GD7X...4E63</span>
+                        <span className="font-semibold text-app-primary">{walletAddress ?? "Not connected"}</span>
                     </div>
+
+                    {claimError && (
+                        <div className="mt-4 rounded-xl bg-app-red/10 p-3 text-sm font-medium text-app-red">{claimError}</div>
+                    )}
 
                     <div className="mt-5 flex gap-3">
                         <AppButton

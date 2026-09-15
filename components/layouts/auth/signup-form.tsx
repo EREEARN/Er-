@@ -1,14 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Briefcase, User } from "lucide-react";
 import { AppImages } from "@/assets/app_images";
 import { AppInput } from "@/components/reuseables/app-input";
 import { AppButton } from "@/components/reuseables/app-button";
 import { cn } from "cn";
 import { Text } from "@/components/reuseables/text";
+import { useRegister } from "@/hooks/use-auth";
+import { getApiErrorMessage } from "@/lib/api/api-error";
+import type { UserRole } from "@/lib/api/types";
 
 type Role = "earn" | "post";
 
@@ -16,6 +21,11 @@ const roles: { id: Role; title: string; subtitle: string; icon: React.ReactNode 
     { id: "earn", title: "I want to earn", subtitle: "Contributor / Developer", icon: <User className="size-4" /> },
     { id: "post", title: "I want to post", subtitle: "Poster / Client", icon: <Briefcase className="size-4" /> },
 ];
+
+const roleMap: Record<Role, UserRole> = {
+    earn: "CONTRIBUTOR",
+    post: "POSTER",
+};
 
 const strengthLabels = ["Very weak", "Weak", "Fair", "Good", "Strong password"];
 const strengthColors = ["bg-app-red", "bg-app-red", "bg-amber-500", "bg-amber-500", "bg-app-green"];
@@ -30,10 +40,44 @@ function getPasswordStrength(password: string) {
 }
 
 const SignUpForm = () => {
+    const router = useRouter();
+    const register = useRegister();
     const [role, setRole] = useState<Role>("earn");
+    const [fullName, setFullName] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [agreedToTerms, setAgreedToTerms] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
 
     const strength = useMemo(() => getPasswordStrength(password), [password]);
+
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setFormError(null);
+
+        if (password !== confirmPassword) {
+            setFormError("Passwords do not match.");
+            return;
+        }
+        if (!agreedToTerms) {
+            setFormError("Please agree to the Terms of Service and Privacy Policy.");
+            return;
+        }
+
+        try {
+            await register.mutateAsync({
+                email,
+                username: fullName,
+                password,
+                password_confirm: confirmPassword,
+                role: roleMap[role],
+            });
+            router.push("/dashboard");
+        } catch {
+            // error state is derived from register.error below
+        }
+    };
 
     return (
         <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8">
@@ -43,7 +87,7 @@ const SignUpForm = () => {
                 <Text as="p" className="mt-1 text-sm text-app-grey-light">Start earning or posting bounties</Text>
             </div>
 
-            <form className="mt-6 flex flex-col gap-4">
+            <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
                 <div>
                     <span className="text-sm font-medium text-app-dark-purple">Choose Your Role</span>
                     <div className="mt-2 grid grid-cols-2 gap-3">
@@ -87,8 +131,15 @@ const SignUpForm = () => {
                     </div>
                 </div>
 
-                <AppInput label="Full Name" placeholder="Alex Rivers" />
-                <AppInput label="Email Address" type="email" placeholder="alex@stellarbounties.org" />
+                <AppInput label="Full Name" placeholder="Alex Rivers" value={fullName} onValueChange={setFullName} required />
+                <AppInput
+                    label="Email Address"
+                    type="email"
+                    placeholder="alex@stellarbounties.org"
+                    value={email}
+                    onValueChange={setEmail}
+                    required
+                />
 
                 <div>
                     <AppInput
@@ -97,6 +148,7 @@ const SignUpForm = () => {
                         placeholder="Minimum 8 characters"
                         value={password}
                         onValueChange={(value) => setPassword(value)}
+                        required
                     />
                     {password && (
                         <div className="mt-2">
@@ -118,10 +170,22 @@ const SignUpForm = () => {
                     )}
                 </div>
 
-                <AppInput label="Confirm Password" type="password" placeholder="Re-enter your password" />
+                <AppInput
+                    label="Confirm Password"
+                    type="password"
+                    placeholder="Re-enter your password"
+                    value={confirmPassword}
+                    onValueChange={setConfirmPassword}
+                    required
+                />
 
                 <label className="flex items-start gap-2 text-sm text-app-grey-light">
-                    <input type="checkbox" className="mt-0.5 size-4 rounded border-gray-300 accent-app-primary" />
+                    <input
+                        type="checkbox"
+                        checked={agreedToTerms}
+                        onChange={(event) => setAgreedToTerms(event.target.checked)}
+                        className="mt-0.5 size-4 rounded border-gray-300 accent-app-primary"
+                    />
                     <span>
                         I agree to the{" "}
                         <Link href="#" className="font-medium text-app-primary hover:underline">
@@ -134,8 +198,14 @@ const SignUpForm = () => {
                     </span>
                 </label>
 
-                <AppButton variant="primary" type="submit" className="w-full">
-                    Create Account
+                {(formError || register.isError) && (
+                    <Text as="p" className="text-sm text-app-red">
+                        {formError ?? getApiErrorMessage(register.error)}
+                    </Text>
+                )}
+
+                <AppButton variant="primary" type="submit" className="w-full" disabled={register.isPending}>
+                    {register.isPending ? "Creating Account..." : "Create Account"}
                 </AppButton>
             </form>
 

@@ -1,15 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import type { FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppImages } from "@/assets/app_images";
 import { AppInput } from "@/components/reuseables/app-input";
 import { AppButton } from "@/components/reuseables/app-button";
 import { Text } from "@/components/reuseables/text";
+import { useLogin } from "@/hooks/use-auth";
+import { getApiErrorMessage } from "@/lib/api/api-error";
 
 const LoginForm = () => {
+    const router = useRouter();
+    const login = useLogin();
     const [showPassword, setShowPassword] = useState(false);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        try {
+            await login.mutateAsync({ email, password });
+            router.push("/dashboard");
+        } catch {
+            // error state is derived from login.error below
+        }
+    };
 
     return (
         <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8">
@@ -19,13 +37,23 @@ const LoginForm = () => {
                 <Text as="p" className="mt-1 text-sm text-app-grey-light">Sign in to your account</Text>
             </div>
 
-            <form className="mt-6 flex flex-col gap-4">
-                <AppInput label="Email Address" type="email" placeholder="name@example.com" />
+            <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
+                <AppInput
+                    label="Email Address"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onValueChange={setEmail}
+                    required
+                />
 
                 <AppInput
                     label="Password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
+                    value={password}
+                    onValueChange={setPassword}
+                    required
                     rightSlot={
                         <button
                             type="button"
@@ -47,8 +75,14 @@ const LoginForm = () => {
                     </Link>
                 </div>
 
-                <AppButton variant="primary" type="submit" className="w-full">
-                    Sign In
+                {login.isError && (
+                    <Text as="p" className="text-sm text-app-red">
+                        {getApiErrorMessage(login.error)}
+                    </Text>
+                )}
+
+                <AppButton variant="primary" type="submit" className="w-full" disabled={login.isPending}>
+                    {login.isPending ? "Signing In..." : "Sign In"}
                 </AppButton>
             </form>
 

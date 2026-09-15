@@ -3,6 +3,7 @@ import { Manrope } from "next/font/google";
 const manrope = Manrope({subsets:['latin'],variable:'--font-sans'}); 
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import QueryProvider from "@/components/providers/query-provider";
 
 
 
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={cn("h-full", "antialiased", "font-sans", manrope.variable)}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <QueryProvider>{children}</QueryProvider>
+      </body>
     </html>
   );
 }

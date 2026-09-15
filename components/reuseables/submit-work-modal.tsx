@@ -11,11 +11,26 @@ type SubmitWorkModalProps = {
     trigger: ReactElement
     files: string[]
     posterName: string
-    onConfirm: () => void
+    onConfirm: () => Promise<void> | void
 }
 
 const SubmitWorkModal = ({ trigger, files, posterName, onConfirm }: SubmitWorkModalProps) => {
     const [open, setOpen] = useState(false)
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+
+    const handleConfirm = async () => {
+        setIsSubmitting(true)
+        setError(null)
+        try {
+            await onConfirm()
+            setOpen(false)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Unable to submit your work. Please try again.")
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
 
     return (
         <AppModal trigger={trigger} open={open} onOpenChange={setOpen}>
@@ -45,19 +60,27 @@ const SubmitWorkModal = ({ trigger, files, posterName, onConfirm }: SubmitWorkMo
                     Make sure all test cases match and your scripts run smoothly. You cannot edit files while the review process is active.
                 </div>
 
+                {error && (
+                    <div className="mt-4 w-full rounded-xl bg-app-red/10 p-3 text-sm font-medium text-app-red">{error}</div>
+                )}
+
                 <div className="mt-5 flex w-full gap-3">
-                    <AppButton variant="outline" color="#111827" className="flex-1 justify-center" onClick={() => setOpen(false)}>
+                    <AppButton
+                        variant="outline"
+                        color="#111827"
+                        className="flex-1 justify-center"
+                        onClick={() => setOpen(false)}
+                        disabled={isSubmitting}
+                    >
                         Go Back
                     </AppButton>
                     <AppButton
                         variant="primary"
                         className="flex-1 justify-center"
-                        onClick={() => {
-                            onConfirm()
-                            setOpen(false)
-                        }}
+                        onClick={handleConfirm}
+                        disabled={isSubmitting}
                     >
-                        Confirm Submission
+                        {isSubmitting ? "Submitting..." : "Confirm Submission"}
                     </AppButton>
                 </div>
             </div>

@@ -1,14 +1,7 @@
-import { notFound } from "next/navigation";
-import BountyDetails from "@/components/layouts/marketplace/bounty-details";
-import { getBountyById } from "@/lib/bounties";
+import BountyDetailsContainer from "@/components/layouts/marketplace/bounty-details-container";
 
 export default async function DashboardBountyDetailsPage(props: PageProps<"/dashboard/marketplace/[id]">) {
     const { id } = await props.params;
-    const bounty = getBountyById(id);
 
-    if (!bounty) {
-        notFound();
-    }
-
-    return <BountyDetails bounty={bounty} />;
+    return <BountyDetailsContainer id={id} marketplaceHref="/dashboard/marketplace" />;
 }

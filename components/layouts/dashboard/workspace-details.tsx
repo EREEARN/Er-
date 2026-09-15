@@ -5,6 +5,7 @@ import { Check, Clock, FileText, Star, Trash2, UploadCloud } from "lucide-react"
 import { AppButton } from "@/components/reuseables/app-button";
 import { SubmitWorkModal } from "@/components/reuseables/submit-work-modal";
 import { PaymentReceivedModal } from "@/components/reuseables/payment-received-modal";
+import { useSubmitBountyWork } from "@/hooks/use-bounties";
 import type { Bounty } from "@/lib/bounties";
 import { cn } from "cn";
 import { Text } from "@/components/reuseables/text";
@@ -28,6 +29,7 @@ const WorkspaceDetails = ({ bounty }: WorkspaceDetailsProps) => {
     ]);
     const [comment, setComment] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const submitWork = useSubmitBountyWork(bounty.id);
 
     const currentStep = stage === "working" ? 2 : stage === "review" ? 3 : 5;
 
@@ -230,7 +232,13 @@ const WorkspaceDetails = ({ bounty }: WorkspaceDetailsProps) => {
                                 }
                                 files={files.map((file) => file.name)}
                                 posterName={bounty.poster}
-                                onConfirm={() => setStage("review")}
+                                onConfirm={async () => {
+                                    await submitWork.mutateAsync({
+                                        submission_text: comment,
+                                        submission_url: files[0]?.name ?? "",
+                                    });
+                                    setStage("review");
+                                }}
                             />
                         </div>
                     </>
