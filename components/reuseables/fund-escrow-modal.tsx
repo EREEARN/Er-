@@ -2,47 +2,73 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { CircleCheck, LoaderCircle } from "lucide-react"
+import { CircleCheck, CircleX, LoaderCircle } from "lucide-react"
 import { AppModal } from "@/components/reuseables/app-modal"
 import { AppButton } from "@/components/reuseables/app-button"
+import { AppInput } from "@/components/reuseables/app-input"
 import { Text } from "@/components/reuseables/text"
+import { useCreateBounty, usePrepareFundBounty } from "@/hooks/use-bounties"
+import { getApiErrorMessage } from "@/lib/api/api-error"
+import type { CreateBountyPayload } from "@/lib/api/types"
 
 type FundEscrowModalProps = {
     open: boolean
     onOpenChange: (open: boolean) => void
-    bountyAmount: number
+    bountyPayload: CreateBountyPayload
     platformFeePercent: number
     walletBalance: number
-    escrowAddress: string
 }
+
+type Stage = "confirm" | "preparing" | "sign" | "publishing" | "published" | "failed"
 
 const FundEscrowModal = ({
     open,
     onOpenChange,
-    bountyAmount,
+    bountyPayload,
     platformFeePercent,
     walletBalance,
-    escrowAddress,
 }: FundEscrowModalProps) => {
-    const [stage, setStage] = useState<"confirm" | "processing" | "published">("confirm")
+    const [stage, setStage] = useState<Stage>("confirm")
+    const [signedXdr, setSignedXdr] = useState("")
+
+    const prepareFund = usePrepareFundBounty()
+    const createBounty = useCreateBounty()
+
+    const bountyAmount = Number(bountyPayload.reward_amount) || 0
     const fee = Math.round(bountyAmount * (platformFeePercent / 100) * 100) / 100
     const total = bountyAmount + fee
 
     useEffect(() => {
         if (!open) {
             setStage("confirm")
+            setSignedXdr("")
+            prepareFund.reset()
+            createBounty.reset()
         }
     }, [open])
 
-    useEffect(() => {
-        if (stage !== "processing") return
+    const handlePrepare = async () => {
+        setStage("preparing")
+        try {
+            await prepareFund.mutateAsync(bountyPayload)
+            setStage("sign")
+        } catch {
+            setStage("failed")
+        }
+    }
 
-        const timeout = setTimeout(() => setStage("published"), 2500)
-        return () => clearTimeout(timeout)
-    }, [stage])
+    const handlePublish = async () => {
+        setStage("publishing")
+        try {
+            await createBounty.mutateAsync({ ...bountyPayload, signed_xdr: signedXdr })
+            setStage("published")
+        } catch {
+            setStage("failed")
+        }
+    }
 
     return (
-        <AppModal open={open} onOpenChange={onOpenChange} showCloseButton={stage === "confirm"}>
+        <AppModal open={open} onOpenChange={onOpenChange} showCloseButton={stage === "confirm" || stage === "sign"}>
             {stage === "confirm" && (
                 <div>
                     <Text as="h2" className="text-lg font-bold text-app-dark-purple">Fund Your Bounty</Text>
@@ -53,26 +79,32 @@ const FundEscrowModal = ({
                     <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm">
                         <div className="flex items-center justify-between">
                             <span className="text-app-grey-light">Bounty Escrow Amount</span>
-                            <span className="font-semibold text-app-dark-purple">{bountyAmount.toLocaleString()} XLM</span>
+                            <span className="font-semibold text-app-dark-purple">{bountyAmount.toLocaleString()} {bountyPayload.reward_asset}</span>
                         </div>
                         <div className="mt-2 flex items-center justify-between">
                             <span className="text-app-grey-light">Platform Service Fee ({platformFeePercent}%)</span>
-                            <span className="font-semibold text-app-dark-purple">{fee.toLocaleString()} XLM</span>
+                            <span className="font-semibold text-app-dark-purple">{fee.toLocaleString()} {bountyPayload.reward_asset}</span>
                         </div>
                         <div className="mt-3 flex items-center justify-between border-t border-gray-200 pt-3">
                             <span className="font-semibold text-app-dark-purple">Total Payable</span>
-                            <span className="font-bold text-app-primary">{total.toLocaleString()} XLM</span>
+                            <span className="font-bold text-app-primary">{total.toLocaleString()} {bountyPayload.reward_asset}</span>
                         </div>
                     </div>
 
                     <div className="mt-4 flex items-center justify-between text-sm">
                         <span className="text-app-grey-light">Your Wallet Balance</span>
-                        <span className="font-semibold text-app-green">{walletBalance.toLocaleString()} XLM</span>
+                        <span className="font-semibold text-app-green">{walletBalance.toLocaleString()} {bountyPayload.reward_asset}</span>
                     </div>
 
                     <div className="mt-4 rounded-xl bg-app-light-primary/50 p-3 text-sm text-app-primary">
                         Locked escrow funds are secure and immutable. They cannot be unilaterally withdrawn by either party while the milestone deadline is active.
                     </div>
+
+                    {prepareFund.isError && (
+                        <Text as="p" className="mt-3 text-sm text-app-red">
+                            {getApiErrorMessage(prepareFund.error)}
+                        </Text>
+                    )}
 
                     <div className="mt-5 flex gap-3">
                         <AppButton
@@ -83,45 +115,96 @@ const FundEscrowModal = ({
                         >
                             Cancel
                         </AppButton>
-                        <AppButton variant="primary" className="flex-1 justify-center" onClick={() => setStage("processing")}>
-                            Confirm &amp; Fund
+                        <AppButton
+                            variant="primary"
+                            className="flex-1 justify-center"
+                            disabled={prepareFund.isPending}
+                            onClick={handlePrepare}
+                        >
+                            {prepareFund.isPending ? "Preparing..." : "Confirm & Fund"}
                         </AppButton>
                     </div>
                 </div>
             )}
 
-            {stage === "processing" && (
+            {stage === "preparing" && (
                 <div className="flex flex-col items-center text-center">
                     <span className="flex size-14 items-center justify-center rounded-full bg-app-light-primary text-app-primary">
                         <LoaderCircle className="size-7 animate-spin" />
                     </span>
-                    <Text as="h2" className="mt-4 text-lg font-bold text-app-dark-purple">Funding Escrow...</Text>
+                    <Text as="h2" className="mt-4 text-lg font-bold text-app-dark-purple">Preparing Escrow Transaction...</Text>
                     <Text as="p" className="mt-2 text-sm text-app-grey-light">
-                        Transferring {total.toLocaleString()} XLM to the Soroban smart contract. Please do not close this window.
+                        Building the Soroban transaction for your bounty. Please do not close this window.
+                    </Text>
+                </div>
+            )}
+
+            {stage === "sign" && prepareFund.data && (
+                <div>
+                    <Text as="h2" className="text-lg font-bold text-app-dark-purple">Sign the Escrow Transaction</Text>
+                    <Text as="p" className="mt-1 text-sm text-app-grey-light">
+                        Sign this transaction with your wallet, then paste the signed XDR below to publish your bounty.
                     </Text>
 
-                    <div className="mt-4 w-full rounded-xl bg-gray-50 p-3 text-left text-sm">
-                        <div className="flex items-center justify-between">
-                            <span className="text-app-grey-light">Network</span>
-                            <span className="font-semibold text-amber-600">Stellar Testnet</span>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between">
-                            <span className="text-app-grey-light">Tx Hash</span>
-                            <span className="font-semibold text-app-primary">fa89...a7e3</span>
-                        </div>
+                    <div className="mt-4 rounded-xl bg-gray-50 p-4">
+                        <Text as="p" className="text-xs font-semibold uppercase tracking-wide text-app-grey-light">Transaction XDR</Text>
+                        <Text as="p" className="mt-1 max-h-24 overflow-y-auto break-all text-xs font-medium text-app-dark-purple">
+                            {prepareFund.data.xdr}
+                        </Text>
+                        <Text as="p" className="mt-2 text-xs text-app-grey-light">
+                            Network: {prepareFund.data.network_passphrase}
+                        </Text>
                     </div>
 
-                    <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                        <div className="h-full w-2/3 rounded-full bg-app-primary" />
+                    <div className="mt-4">
+                        <AppInput
+                            label="Signed XDR"
+                            placeholder="Paste the signed transaction XDR from your wallet"
+                            value={signedXdr}
+                            onValueChange={setSignedXdr}
+                        />
                     </div>
-                    <div className="mt-2 flex w-full items-center justify-between text-xs text-app-grey-light">
-                        <span>Confirming ledger transaction</span>
-                        <span className="font-medium text-app-primary">Ledger #45892</span>
+
+                    {createBounty.isError && (
+                        <Text as="p" className="mt-3 text-sm text-app-red">
+                            {getApiErrorMessage(createBounty.error)}
+                        </Text>
+                    )}
+
+                    <div className="mt-5 flex gap-3">
+                        <AppButton
+                            variant="outline"
+                            color="#111827"
+                            className="flex-1 justify-center"
+                            onClick={() => onOpenChange(false)}
+                        >
+                            Cancel
+                        </AppButton>
+                        <AppButton
+                            variant="primary"
+                            className="flex-1 justify-center"
+                            disabled={!signedXdr || createBounty.isPending}
+                            onClick={handlePublish}
+                        >
+                            {createBounty.isPending ? "Publishing..." : "Publish Bounty"}
+                        </AppButton>
                     </div>
                 </div>
             )}
 
-            {stage === "published" && (
+            {stage === "publishing" && (
+                <div className="flex flex-col items-center text-center">
+                    <span className="flex size-14 items-center justify-center rounded-full bg-app-light-primary text-app-primary">
+                        <LoaderCircle className="size-7 animate-spin" />
+                    </span>
+                    <Text as="h2" className="mt-4 text-lg font-bold text-app-dark-purple">Publishing Bounty...</Text>
+                    <Text as="p" className="mt-2 text-sm text-app-grey-light">
+                        Submitting your signed transaction to the Soroban smart contract. Please do not close this window.
+                    </Text>
+                </div>
+            )}
+
+            {stage === "published" && createBounty.data && (
                 <div className="flex flex-col items-center text-center">
                     <span className="flex size-14 items-center justify-center rounded-full bg-app-green/10 text-app-green">
                         <CircleCheck className="size-7" />
@@ -138,11 +221,11 @@ const FundEscrowModal = ({
                         </div>
                         <div className="mt-2 flex items-center justify-between">
                             <span className="text-app-grey-light">Amount Funded</span>
-                            <span className="font-semibold text-app-dark-purple">{bountyAmount.toLocaleString()} XLM</span>
+                            <span className="font-semibold text-app-dark-purple">{bountyAmount.toLocaleString()} {bountyPayload.reward_asset}</span>
                         </div>
                         <div className="mt-2 flex items-center justify-between">
-                            <span className="text-app-grey-light">Stellar Escrow Address</span>
-                            <span className="font-semibold text-app-primary">{escrowAddress}</span>
+                            <span className="text-app-grey-light">Escrow Tx Hash</span>
+                            <span className="font-semibold text-app-primary">{createBounty.data.escrow_tx_hash}</span>
                         </div>
                     </div>
 
@@ -159,9 +242,35 @@ const FundEscrowModal = ({
                     </AppButton>
                 </div>
             )}
+
+            {stage === "failed" && (
+                <div className="flex flex-col items-center text-center">
+                    <span className="flex size-14 items-center justify-center rounded-full bg-app-red/10 text-app-red">
+                        <CircleX className="size-7" />
+                    </span>
+                    <Text as="h2" className="mt-4 text-lg font-bold text-app-dark-purple">Something Went Wrong</Text>
+                    <Text as="p" className="mt-2 text-sm text-app-grey-light">
+                        {getApiErrorMessage(createBounty.error ?? prepareFund.error)}
+                    </Text>
+
+                    <div className="mt-5 flex w-full flex-col gap-3">
+                        <AppButton
+                            variant="primary"
+                            className="w-full justify-center"
+                            onClick={() => setStage(prepareFund.data ? "sign" : "confirm")}
+                        >
+                            Try Again
+                        </AppButton>
+                        <AppButton variant="outline" color="#111827" className="w-full justify-center" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </AppButton>
+                    </div>
+                </div>
+            )}
         </AppModal>
     )
 }
 
 export { FundEscrowModal }
 export type { FundEscrowModalProps }
+

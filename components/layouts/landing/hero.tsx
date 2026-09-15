@@ -1,5 +1,6 @@
 import { Text } from "@/components/reuseables/text";
 import Image from "next/image";
+import Link from "next/link";
 import { AppImages } from "@/assets/app_images";
 import React from "react";
 import { AppButton } from "@/components/reuseables/app-button";
@@ -21,14 +22,14 @@ const Hero = () => {
             <AppButton
                 variant="primary"
                 className="px-6 py-3"
-
+                render={<Link href="/marketplace" />}
             >
                 Browse Open Bounties
             </AppButton>
             <AppButton
                 variant="outline"
                 className="px-6 py-3"
-
+                render={<Link href="/login" />}
             >
                 Post a Bounty
             </AppButton>

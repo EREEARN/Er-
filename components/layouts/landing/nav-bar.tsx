@@ -48,7 +48,7 @@ const NavBar = () => {
         </nav>
 
         <div className="hidden md:flex gap-3 items-center w-fit">
-            <Link href="#login" className="text-app-dark-purple font-semibold hover:text-app-primary">Post Bounty</Link>
+            <Link href="/login" className="text-app-dark-purple font-semibold hover:text-app-primary">Post Bounty</Link>
             <ConnectWalletModal trigger={<AppButton variant="primary">Connect Wallet</AppButton>} />
         </div>
 
@@ -78,7 +78,7 @@ const NavBar = () => {
                                 {link.label}
                             </Link>
                         ))}
-                        <Link href="#login" className="font-semibold text-app-dark-purple hover:text-app-primary">Post Bounty</Link>
+                        <Link href="/login" className="font-semibold text-app-dark-purple hover:text-app-primary">Post Bounty</Link>
                         <AppButton variant="primary" className="w-full">Connect Wallet</AppButton>
                     </div>
                 </SheetContent>

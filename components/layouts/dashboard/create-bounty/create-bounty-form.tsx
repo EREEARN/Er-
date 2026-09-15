@@ -10,16 +10,24 @@ import MarketplacePreview from "@/components/layouts/dashboard/create-bounty/mar
 import { FundEscrowModal } from "@/components/reuseables/fund-escrow-modal";
 import { cn } from "cn";
 import { Text } from "@/components/reuseables/text";
+import type { CreateBountyPayload, SkillCategory } from "@/lib/api/types";
 
 const steps = ["Bounty Details", "Reward", "Deadline", "Review & Publish", "Fund Escrow"];
-const categories = ["Development", "Design", "Content", "Research"];
+const categories: { value: SkillCategory; label: string }[] = [
+    { value: "DEVELOPMENT", label: "Development" },
+    { value: "DESIGN", label: "Design" },
+    { value: "WRITING", label: "Writing" },
+    { value: "VIDEO", label: "Video" },
+    { value: "PROJECT_MANAGEMENT", label: "Project Management" },
+    { value: "COMMUNITY", label: "Community" },
+];
 
 const CreateBountyForm = () => {
     const [step, setStep] = useState(0);
     const [fundModalOpen, setFundModalOpen] = useState(false);
 
     const [title, setTitle] = useState("Build Stellar Wallet Connector React Hook");
-    const [category, setCategory] = useState(categories[0]);
+    const [category, setCategory] = useState<SkillCategory>(categories[0].value);
     const [description, setDescription] = useState(
         "Create an optimized, easily extensible custom React hook to manage freighter and albedo wallet connections on the Stellar Testnet. This should handle session persistence..."
     );
@@ -69,6 +77,23 @@ const CreateBountyForm = () => {
         ? deadlineDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
         : "No deadline set";
 
+    const deadlineIso = (() => {
+        if (!deadlineDate) return new Date().toISOString();
+        const [hours, minutes] = endTime.split(":").map(Number);
+        const combined = new Date(deadlineDate);
+        combined.setHours(hours || 0, minutes || 0, 0, 0);
+        return combined.toISOString();
+    })();
+
+    const bountyPayload: CreateBountyPayload = {
+        title,
+        description,
+        skill_category: category,
+        reward_amount: rewardAmount,
+        reward_asset: asset,
+        deadline: deadlineIso,
+    };
+
     return (
         <div>
             <StepHeader steps={steps} currentStep={step} />
@@ -90,12 +115,12 @@ const CreateBountyForm = () => {
                                     <div className="relative">
                                         <select
                                             value={category}
-                                            onChange={(event) => setCategory(event.target.value)}
+                                            onChange={(event) => setCategory(event.target.value as SkillCategory)}
                                             className="h-10 w-full appearance-none rounded-[6px] border border-app-light-primary bg-white px-3.5 text-sm text-app-dark-purple outline-none focus-visible:border-app-primary focus-visible:ring-3 focus-visible:ring-app-primary/20"
                                         >
                                             {categories.map((option) => (
-                                                <option key={option} value={option}>
-                                                    {option}
+                                                <option key={option.value} value={option.value}>
+                                                    {option.label}
                                                 </option>
                                             ))}
                                         </select>
@@ -482,10 +507,9 @@ const CreateBountyForm = () => {
             <FundEscrowModal
                 open={fundModalOpen}
                 onOpenChange={setFundModalOpen}
-                bountyAmount={rewardNumber}
+                bountyPayload={bountyPayload}
                 platformFeePercent={platformFeePercent}
                 walletBalance={4520.45}
-                escrowAddress="CBSA...8K2L"
             />
         </div>
     );
