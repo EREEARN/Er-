@@ -10,12 +10,24 @@ import { Pagination } from "@/components/reuseables/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import EmptyState from "@/components/reuseables/empty-state";
 import Footer from "@/components/layouts/landing/footer";
+import { cn } from "cn";
 import { useBounties } from "@/hooks/use-bounties";
 import { mapApiBountyToLocal } from "@/lib/api/mappers";
+import type { SkillCategory } from "@/lib/api/types";
+
+const categoryOptions: { label: string; value: SkillCategory }[] = [
+    { label: "Development", value: "DEVELOPMENT" },
+    { label: "Design", value: "DESIGN" },
+    { label: "Writing", value: "WRITING" },
+    { label: "Video", value: "VIDEO" },
+    { label: "Project Management", value: "PROJECT_MANAGEMENT" },
+    { label: "Community", value: "COMMUNITY" },
+];
 
 export default function MarketplacePage() {
     const [page, setPage] = useState(1);
-    const { data, isLoading, isError } = useBounties({ page });
+    const [category, setCategory] = useState<SkillCategory | null>(null);
+    const { data, isLoading, isError } = useBounties({ page, skill_category: category ?? undefined });
     const bounties = data?.results.map(mapApiBountyToLocal) ?? [];
     const totalPages = data ? Math.max(1, Math.ceil(data.count / bounties.length || 1)) : 1;
 
@@ -29,10 +41,38 @@ export default function MarketplacePage() {
                     className="h-12 rounded-full"
                 />
 
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {categoryOptions.map((option) => (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                                setCategory(category === option.value ? null : option.value);
+                                setPage(1);
+                            }}
+                            className={cn(
+                                "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                                category === option.value
+                                    ? "border-app-primary bg-app-light-primary text-app-primary"
+                                    : "border-transparent bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            )}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>
+
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-app-grey-light">
-                    <span>Active filters:</span>
-                    <FilterChip label="Development" selected />
-                    <FilterChip label="Open" />
+                    {category && (
+                        <>
+                            <span>Active filters:</span>
+                            <FilterChip
+                                label={categoryOptions.find((option) => option.value === category)?.label ?? category}
+                                selected
+                                onRemove={() => setCategory(null)}
+                            />
+                        </>
+                    )}
                     <span className="ml-1">Showing {data?.count ?? 0} bounties</span>
                 </div>
 
