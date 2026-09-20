@@ -1,5 +1,13 @@
+import type { Metadata } from "next";
 import SignUpForm from "@/components/layouts/auth/signup-form";
 import Footer from "@/components/layouts/landing/footer";
+
+export const metadata: Metadata = {
+    title: "Sign Up",
+    description: "Create an EreEarn account to post or claim fully-funded bounties.",
+    alternates: { canonical: "/signup" },
+    robots: { index: false, follow: true },
+};
 
 export default function SignUpPage() {
     return (
