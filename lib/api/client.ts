@@ -2,7 +2,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/lib/auth-store";
 import type { AuthTokens } from "@/lib/api/types";
 
-export const API_BASE_URL = "https://api.ereearn.com";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export const apiClient = axios.create({
     baseURL: API_BASE_URL,
