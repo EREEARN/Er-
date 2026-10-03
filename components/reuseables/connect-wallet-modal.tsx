@@ -31,7 +31,7 @@ function truncateAddress(address: string) {
 }
 
 const ConnectWalletModal = ({ trigger }: ConnectWalletModalProps) => {
-    // states
+    // statess
     const [open, setOpen] = useState(false)
     const [step, setStep] = useState<Step>("address")
     const [walletAddress, setWalletAddress] = useState("")
