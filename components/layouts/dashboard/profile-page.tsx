@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { AppButton } from "@/components/reuseables/app-button";
 import { ConnectWalletModal } from "@/components/reuseables/connect-wallet-modal";
 import { Spinner } from "@/components/ui/spinner";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { useAuthStore } from "@/lib/auth-store";
+import { StellarWalletsKit } from "@/lib/stellar-wallets-kit";
 import { cn } from "cn";
 import { Text } from "@/components/reuseables/text";
 
@@ -18,6 +21,18 @@ const ProfilePage = () => {
     const [emailNotifications, setEmailNotifications] = useState(true);
     const [theme, setTheme] = useState("Light Mode");
     const [language, setLanguage] = useState("English (US)");
+    const router = useRouter();
+    const clearAuth = useAuthStore((state) => state.clearAuth);
+
+    const handleDisconnect = async () => {
+        try {
+            await StellarWalletsKit.disconnect();
+        } catch {
+            // ignore - we're clearing local auth state regardless
+        }
+        clearAuth();
+        router.push("/login");
+    };
 
     if (isLoading || !user) {
         return (
@@ -135,7 +150,12 @@ const ProfilePage = () => {
                             Stellar Wallet
                         </span>
                         {user.wallet_address ? (
-                            <span className="text-sm font-semibold text-app-primary">{user.wallet_address}</span>
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-semibold text-app-primary">{user.wallet_address}</span>
+                                <AppButton variant="outline" color="#DC2626" className="h-8 px-3 text-xs" onClick={handleDisconnect}>
+                                    Disconnect
+                                </AppButton>
+                            </div>
                         ) : (
                             <ConnectWalletModal
                                 trigger={

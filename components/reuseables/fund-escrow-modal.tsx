@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { CircleCheck, CircleX, LoaderCircle } from "lucide-react"
+import { CircleCheck, CircleX, LoaderCircle, Wallet } from "lucide-react"
 import { AppModal } from "@/components/reuseables/app-modal"
 import { AppButton } from "@/components/reuseables/app-button"
-import { AppInput } from "@/components/reuseables/app-input"
 import { Text } from "@/components/reuseables/text"
 import { useCreateBounty, usePrepareFundBounty } from "@/hooks/use-bounties"
 import { getApiErrorMessage } from "@/lib/api/api-error"
 import type { CreateBountyPayload } from "@/lib/api/types"
+import { initStellarWalletsKit, isStellarWalletsKitError, StellarWalletsKit } from "@/lib/stellar-wallets-kit"
 
 type FundEscrowModalProps = {
     open: boolean
@@ -18,7 +18,7 @@ type FundEscrowModalProps = {
     platformFeePercent: number
 }
 
-type Stage = "confirm" | "preparing" | "sign" | "publishing" | "published" | "failed"
+type Stage = "confirm" | "preparing" | "signing" | "publishing" | "published" | "failed"
 
 const FundEscrowModal = ({
     open,
@@ -27,7 +27,7 @@ const FundEscrowModal = ({
     platformFeePercent,
 }: FundEscrowModalProps) => {
     const [stage, setStage] = useState<Stage>("confirm")
-    const [signedXdr, setSignedXdr] = useState("")
+    const [kitErrorMessage, setKitErrorMessage] = useState<string | null>(null)
 
     const prepareFund = usePrepareFundBounty()
     const createBounty = useCreateBounty()
@@ -39,7 +39,7 @@ const FundEscrowModal = ({
     useEffect(() => {
         if (!open) {
             setStage("confirm")
-            setSignedXdr("")
+            setKitErrorMessage(null)
             prepareFund.reset()
             createBounty.reset()
         }
@@ -47,26 +47,34 @@ const FundEscrowModal = ({
 
     const handlePrepare = async () => {
         setStage("preparing")
+        setKitErrorMessage(null)
         try {
-            await prepareFund.mutateAsync(bountyPayload)
-            setStage("sign")
-        } catch {
-            setStage("failed")
-        }
-    }
+            const prepared = await prepareFund.mutateAsync(bountyPayload)
 
-    const handlePublish = async () => {
-        setStage("publishing")
-        try {
-            await createBounty.mutateAsync({ ...bountyPayload, signed_xdr: signedXdr })
+            setStage("signing")
+            initStellarWalletsKit()
+            const { address } = await StellarWalletsKit.getAddress()
+            const { signedTxXdr } = await StellarWalletsKit.signTransaction(prepared.xdr, {
+                networkPassphrase: prepared.network_passphrase,
+                address,
+            })
+
+            setStage("publishing")
+            await createBounty.mutateAsync({ ...bountyPayload, signed_xdr: signedTxXdr })
             setStage("published")
-        } catch {
+        } catch (err) {
+            if (isStellarWalletsKitError(err) && err.code === -1) {
+                // user closed/cancelled the wallet's signing prompt
+                setStage("confirm")
+                return
+            }
+            setKitErrorMessage(isStellarWalletsKitError(err) ? err.message : null)
             setStage("failed")
         }
     }
 
     return (
-        <AppModal open={open} onOpenChange={onOpenChange} showCloseButton={stage === "confirm" || stage === "sign"}>
+        <AppModal open={open} onOpenChange={onOpenChange} showCloseButton={stage === "confirm"}>
             {stage === "confirm" && (
                 <div>
                     <Text as="h2" className="text-lg font-bold text-app-dark-purple">Fund Your Bounty</Text>
@@ -132,56 +140,15 @@ const FundEscrowModal = ({
                 </div>
             )}
 
-            {stage === "sign" && prepareFund.data && (
-                <div>
-                    <Text as="h2" className="text-lg font-bold text-app-dark-purple">Sign the Escrow Transaction</Text>
-                    <Text as="p" className="mt-1 text-sm text-app-grey-light">
-                        Sign this transaction with your wallet, then paste the signed XDR below to publish your bounty.
+            {stage === "signing" && (
+                <div className="flex flex-col items-center text-center">
+                    <span className="flex size-14 items-center justify-center rounded-full bg-app-light-primary text-app-primary">
+                        <Wallet className="size-7" />
+                    </span>
+                    <Text as="h2" className="mt-4 text-lg font-bold text-app-dark-purple">Confirm in Your Wallet</Text>
+                    <Text as="p" className="mt-2 text-sm text-app-grey-light">
+                        Approve the escrow transaction in your connected wallet to publish your bounty. Please do not close this window.
                     </Text>
-
-                    <div className="mt-4 rounded-xl bg-gray-50 p-4">
-                        <Text as="p" className="text-xs font-semibold uppercase tracking-wide text-app-grey-light">Transaction XDR</Text>
-                        <Text as="p" className="mt-1 max-h-24 overflow-y-auto break-all text-xs font-medium text-app-dark-purple">
-                            {prepareFund.data.xdr}
-                        </Text>
-                        <Text as="p" className="mt-2 text-xs text-app-grey-light">
-                            Network: {prepareFund.data.network_passphrase}
-                        </Text>
-                    </div>
-
-                    <div className="mt-4">
-                        <AppInput
-                            label="Signed XDR"
-                            placeholder="Paste the signed transaction XDR from your wallet"
-                            value={signedXdr}
-                            onValueChange={setSignedXdr}
-                        />
-                    </div>
-
-                    {createBounty.isError && (
-                        <Text as="p" className="mt-3 text-sm text-app-red">
-                            {getApiErrorMessage(createBounty.error)}
-                        </Text>
-                    )}
-
-                    <div className="mt-5 flex gap-3">
-                        <AppButton
-                            variant="outline"
-                            color="#111827"
-                            className="flex-1 justify-center"
-                            onClick={() => onOpenChange(false)}
-                        >
-                            Cancel
-                        </AppButton>
-                        <AppButton
-                            variant="primary"
-                            className="flex-1 justify-center"
-                            disabled={!signedXdr || createBounty.isPending}
-                            onClick={handlePublish}
-                        >
-                            {createBounty.isPending ? "Publishing..." : "Publish Bounty"}
-                        </AppButton>
-                    </div>
                 </div>
             )}
 
@@ -243,14 +210,14 @@ const FundEscrowModal = ({
                     </span>
                     <Text as="h2" className="mt-4 text-lg font-bold text-app-dark-purple">Something Went Wrong</Text>
                     <Text as="p" className="mt-2 text-sm text-app-grey-light">
-                        {getApiErrorMessage(createBounty.error ?? prepareFund.error)}
+                        {kitErrorMessage ?? getApiErrorMessage(createBounty.error ?? prepareFund.error)}
                     </Text>
 
                     <div className="mt-5 flex w-full flex-col gap-3">
                         <AppButton
                             variant="primary"
                             className="w-full justify-center"
-                            onClick={() => setStage(prepareFund.data ? "sign" : "confirm")}
+                            onClick={handlePrepare}
                         >
                             Try Again
                         </AppButton>
