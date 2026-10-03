@@ -26,6 +26,7 @@ const FundEscrowModal = ({
     bountyPayload,
     platformFeePercent,
 }: FundEscrowModalProps) => {
+    // State and hooks for managing the funding process of the bounty escrow
     const [stage, setStage] = useState<Stage>("confirm")
     const [kitErrorMessage, setKitErrorMessage] = useState<string | null>(null)
 
