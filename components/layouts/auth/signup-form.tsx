@@ -43,7 +43,7 @@ const SignUpForm = () => {
     const router = useRouter();
     const register = useRegister();
     const [role, setRole] = useState<Role>("earn");
-    const [fullName, setFullName] = useState("");
+    const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -68,7 +68,7 @@ const SignUpForm = () => {
         try {
             await register.mutateAsync({
                 email,
-                username: fullName,
+                username,
                 password,
                 password_confirm: confirmPassword,
                 role: roleMap[role],
@@ -131,7 +131,13 @@ const SignUpForm = () => {
                     </div>
                 </div>
 
-                <AppInput label="Full Name" placeholder="Alex Rivers" value={fullName} onValueChange={setFullName} required />
+                <AppInput
+                    label="Username"
+                    placeholder="alexrivers"
+                    value={username}
+                    onValueChange={(value) => setUsername(value.replace(/\s+/g, ""))}
+                    required
+                />
                 <AppInput
                     label="Email Address"
                     type="email"
